@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sürpriz | Doğum günü şerefinize hanfendi</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;500;700&family=Dancing+Script:wght@600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* --- MODERN DEĞİŞKENLER VE SIFIRLAMA --- */
+        :root {
+            --bg-color: #0f0f0f;
+            --primary-pink: #ff69b4;
+            --primary-blue: #1e90ff;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --neon-glow: 0 0 10px rgba(255, 105, 180, 0.5), 0 0 20px rgba(255, 105, 180, 0.3);
+        }
+
+        body {
+            background: radial-gradient(circle at center, #1a1a2e 0%, #000000 100%);
+            color: #e0e0e0;
+            font-family: 'Montserrat', sans-serif;
+            margin: 0;
+            padding: 0;
+            overflow-x: hidden;
+            height: 100vh;
+        }
+
+        /* Arkaplan Hareketli Parçacıklar için Canvas */
+        #bgCanvas {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        /* --- GENEL EKRAN YAPISI --- */
+        .screen {
+            width: 100vw;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            top: 0; left: 0;
+            transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .hidden { 
+            opacity: 0; 
+            visibility: hidden; 
+            transform: scale(0.95) translateY(20px); 
+            pointer-events: none; 
+        }
+        .active { 
+            opacity: 1; 
+            visibility: visible; 
+            transform: scale(1) translateY(0); 
+            position: relative; 
+        }
+
+        /* --- EKRAN 1: GELİŞMİŞ 3D ZARF --- */
+        .envelope-container {
+            perspective: 1000px;
+            cursor: pointer;
+        }
+        
+        .envelope {
+            width: 300px;
+            height: 200px;
+            background: linear-gradient(135deg, #333, #444);
+            position: relative;
+            transform-style: preserve-3d;
+            transition: transform 0.5s;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.6);
+            border-radius: 8px;
+        }
+
+        .envelope:hover { transform: translateY(-5px) rotateX(5deg); }
+
+        /* Zarf Kapağı Animasyonu */
+        .flap {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100px;
+            background: linear-gradient(135deg, #555 50%, transparent 50%);
+            clip-path: polygon(0 0, 100% 0, 50% 100%);
+            transform-origin: top;
+            transition: transform 0.6s ease-in-out;
+            z-index: 5;
+        }
+
+        .envelope.open .flap { transform: rotateX(180deg); z-index: 1; }
+        
+        /* Mektup Kağıdı (Zarfın içinden çıkacak) */
+        .paper-preview {
+            position: absolute;
+            top: 10px; left: 10px; right: 10px; bottom: 10px;
+            background: #fff;
+            transition: transform 0.5s 0.2s;
+            z-index: 2;
+            transform: translateY(0);
+        }
+        
+        .envelope.open .paper-preview { transform: translateY(-60px); }
+
+        #openButton {
+            position: absolute;
+            top: 60%; left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--primary-blue);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            padding: 12px 30px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(30, 144, 255, 0.5);
+            animation: pulse 2s infinite;
+            transition: all 0.3s;
+        }
+        
+        #openButton:hover { transform: translate(-50%, -50%) scale(1.1); box-shadow: 0 0 30px var(--primary-blue); }
+
+        @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(30, 144, 255, 0.7); } 70% { box-shadow: 0 0 0 15px rgba(30, 144, 255, 0); } 100% { box-shadow: 0 0 0 0 rgba(30, 144, 255, 0); } }
+
+        /* --- EKRAN 2: MEKTUP (DAKTİLO & GLASSMORPHISM) --- */
+        .letter-overlay {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            max-width: 800px;
+            width: 90%;
+            position: relative;
+            z-index: 20;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .birthday-letter {
+            font-family: 'Segoe UI', sans-serif;
+            font-size: 1.4em;
+            line-height: 1.8;
+            color: #fff;
+            white-space: pre-wrap;
+            min-height: 150px;
+        }
+        
+        /* İmleç efekti */
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s infinite;
+            color: var(--primary-pink);
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        .letter-signature {
+            display: block;
+            text-align: right;
+            margin-top: 40px;
+            font-family: 'Dancing Script', cursive;
+            font-size: 1.8em;
+            color: var(--primary-pink);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 1s ease;
+        }
+
+        .corner-heart {
+            position: fixed;
+            width: 200px; height: 200px;
+            z-index: 15;
+            pointer-events: none;
+            filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.6));
+        }
+        /* Köşe Konumları */
+        #ch1 { top: -20px; left: -20px; }
+        #ch2 { top: -20px; right: -20px; }
+        #ch3 { bottom: -20px; left: -20px; }
+        #ch4 { bottom: -20px; right: -20px; }
+
+        /* --- EKRAN 3: ANA SAYAÇ & DASHBOARD --- */
+        #screen3 { padding: 40px 0; overflow-y: auto; display: block; }
+        
+        .dashboard-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 3em;
+            background: linear-gradient(to right, #fff, #a0a0a0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            margin-bottom: 10px;
+        }
+
+        .highlight-name {
+            color: var(--primary-pink);
+            font-family: 'Dancing Script', cursive;
+            font-size: 1.5em;
+            text-shadow: 0 0 10px rgba(255, 105, 180, 0.3);
+        }
+
+        /* Orta Bölüm: Saat ve Kalpler */
+        .visual-center {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 50px;
+            margin: 50px 0;
+            flex-wrap: wrap;
+        }
+
+        .heart-frame {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            transition: transform 0.3s;
+        }
+        .heart-frame:hover { transform: scale(1.05); }
+
+        /* Analog Saat Geliştirmesi */
+        .clock {
+            width: 180px; height: 180px;
+            border-radius: 50%;
+            background: rgba(20, 20, 20, 0.9);
+            border: 4px solid #6A5ACD;
+            position: relative;
+            box-shadow: 0 0 30px rgba(106, 90, 205, 0.4), inset 0 0 20px #000;
+        }
+        
+        .clock-marker {
+            position: absolute; width: 2px; height: 10px; background: #555;
+            left: 50%; top: 2px; transform-origin: 50% 88px; /* Merkez hizalama */
+        }
+        
+        .hand {
+            position: absolute; bottom: 50%; left: 50%;
+            transform-origin: bottom center;
+            border-radius: 4px;
+            z-index: 10;
+        }
+        .hour { width: 6px; height: 50px; background: #ff69b4; }
+        .minute { width: 4px; height: 70px; background: #1e90ff; }
+        .second { width: 2px; height: 80px; background: red; transition: transform 0.1s cubic-bezier(0.4, 2.08, 0.55, 0.44); } /* Yaylanma efekti */
+        .clock-center {
+            position: absolute; top: 50%; left: 50%;
+            width: 12px; height: 12px;
+            background: #fff; border-radius: 50%;
+            transform: translate(-50%, -50%); z-index: 15;
+            box-shadow: 0 0 10px #fff;
+        }
+
+        .timer-big {
+            font-family: 'Courier New', monospace;
+            font-size: 5em;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 20px rgba(255,255,255,0.4);
+            margin: 20px 0;
+        }
+
+        /* Bilgi Kartları (Grid) */
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+            width: 100%;
+            margin-top: 40px;
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 25px;
+            transition: transform 0.3s, box-shadow 0.3s;
+            text-align: left;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .glass-card::before {
+            content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 5px;
+            background: linear-gradient(90deg, var(--primary-pink), var(--primary-blue));
+        }
+
+        .glass-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.5);
+        }
+
+        .card-title {
+            color: #b0b0b0; font-size: 0.9em; margin-bottom: 15px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .card-title i { color: var(--primary-pink); }
+        
+        .card-main-text { font-size: 1.8em; font-weight: 700; color: #fff; margin-bottom: 5px; }
+        .card-sub-text { font-size: 1em; color: var(--primary-blue); margin-bottom: 20px; }
+
+        .time-box-container {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px;
+            background: rgba(0,0,0,0.3); border-radius: 10px; padding: 10px;
+        }
+        .t-box { text-align: center; }
+        .t-val { display: block; font-size: 1.4em; font-weight: bold; color: #fff; }
+        .t-lbl { font-size: 0.7em; color: #888; text-transform: uppercase; }
+
+        /* Mobil Uyum */
+        @media (max-width: 768px) {
+            .timer-big { font-size: 3em; }
+            .visual-center { flex-direction: column; gap: 30px; }
+            .info-grid { grid-template-columns: 1fr; }
+            .letter-overlay { padding: 20px; width: 85%; }
+            .corner-heart { width: 120px; height: 120px; }
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="bgCanvas"></canvas>
+
+    <section id="screen1" class="screen active">
+        <div class="envelope-container" onclick="handleEnvelopeClick()">
+            <div class="envelope" id="mainEnvelope">
+                <div class="flap"></div>
+                <div class="paper-preview"></div>
+                <button id="openButton">DOKUN</button>
+            </div>
+        </div>
+        <p style="margin-top: 50px; opacity: 0.6; font-size: 0.9em; letter-spacing: 2px;">SÜRPRİZ İÇİN KİLİDİ AÇ</p>
+    </section>
+
+    <section id="screen2" class="screen hidden">
+        <div id="ch1" class="corner-heart"><canvas id="ch1Canvas"></canvas></div>
+        <div id="ch2" class="corner-heart"><canvas id="ch2Canvas"></canvas></div>
+        <div id="ch3" class="corner-heart"><canvas id="ch3Canvas"></canvas></div>
+        <div id="ch4" class="corner-heart"><canvas id="ch4Canvas"></canvas></div>
+
+        <div class="letter-overlay" onclick="nextScreen()">
+            <div id="typewriterTarget" class="birthday-letter typing-cursor"></div>
+            
+            <div id="signatureTarget" class="letter-signature">
+                ------Seni Seviyorum -----hz.bora.efendi(as) yada 'kaptan buggy'
+            </div>
+            
+            <div id="originalText" style="display:none;">Doğum günün kutlu olsun  Bu özel gününde seni ne kadar çok sevdiğimi ve benim için ne kadar önemli olduğunu sana nasıl ileticeğimi bilemedim(herzamanki gibi dfjfdjkf), asıl planım poster hediyesi falandı ama inatla istemediğini söyleyince bende üzerine en çok uğraştığım ve çok sevdiğim şeylerin başında gelen yazılımı kullanıp en sevdiğime hediye bir web site tarzı bişiy yapmak istedim umarım beğenirsin hediyemi ,biliyorum çok büyük harika bişiy değil keşke daha iyisi olsaydı umarım beğenirsin dediğim gibi ...     /Senin yanındayım ve seni seviyorum sevgilim/  .</div>
+        </div>
+        
+        <p style="margin-top: 20px; color: #aaa; animation: pulse 2s infinite; cursor: pointer;">
+            <i class="fas fa-arrow-right"></i> Devam etmek için ekrana dokun
+        </p>
+    </section>
+
+    <section id="screen3" class="screen hidden">
+        <div class="dashboard-container">
+            <header>
+                <h1>Hediye-i şerif </h1>
+                <p style="color: #aaa; letter-spacing: 1px;">Hediye almamaya söz verdim ama yapmamaya söz vermedim umarım beğenirsinn</p>
+                <div style="font-style: italic; max-width: 600px; margin: 15px auto; color: #a0a0a0; font-size: 0.9em;">
+                    Nice mutlu yıllara Umarım önündeki yıllarda mutluluğun katlanarak artar, doğum ve yetişknilik günün kutlu olsunnn seni seviyorumm.
+                    <span class="highlight-name" style="display:block; margin-top:5px;">Hz.Bora.Efendi</span>
+                </div>
+            </header>
+
+            <div class="visual-center">
+                <div class="heart-frame">
+                    <canvas id="pinkHeartCanvas" width="220" height="220"></canvas>
+                </div>
+
+                <div class="clock">
+                    <div class="clock-marker" style="transform: rotate(0deg) translateY(2px)"></div>
+                    <div class="clock-marker" style="transform: rotate(90deg) translateY(2px)"></div>
+                    <div class="clock-marker" style="transform: rotate(180deg) translateY(2px)"></div>
+                    <div class="clock-marker" style="transform: rotate(270deg) translateY(2px)"></div>
+                    
+                    <div class="hand hour" id="hourHand"></div>
+                    <div class="hand minute" id="minuteHand"></div>
+                    <div class="hand second" id="secondHand"></div>
+                    <div class="clock-center"></div>
+                </div>
+
+                <div class="heart-frame">
+                    <canvas id="blueHeartCanvas" width="220" height="220"></canvas>
+                </div>
+            </div>
+
+            <div class="timer-big" id="currentTimer">00:00:00</div>
+
+            <div class="info-grid">
+                <div class="glass-card">
+                    <div class="card-title"><i class="fas fa-handshake"></i> İLK TANIŞTIĞIMIZ GÜN</div>
+                    <div class="card-main-text" id="firstDateDisplay"></div>
+                    <div class="card-sub-text" id="firstDateElapsed">Hesaplanıyor...</div>
+                    <div class="time-box-container">
+                        <div class="t-box"><span class="t-val" id="firstDays">0</span><span class="t-lbl">Gün</span></div>
+                        <div class="t-box"><span class="t-val" id="firstHours">0</span><span class="t-lbl">Sa</span></div>
+                        <div class="t-box"><span class="t-val" id="firstMinutes">0</span><span class="t-lbl">Dk</span></div>
+                        <div class="t-box"><span class="t-val" id="firstSeconds">0</span><span class="t-lbl">Sn</span></div>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <div class="card-title"><i class="fas fa-heart"></i> YENİDEN BİRLİKTE OLDUĞUMUZ GÜN</div>
+                    <div class="card-main-text" id="reunionDateDisplay"></div>
+                    <div class="card-sub-text" id="reunionDateElapsed">Hesaplanıyor...</div>
+                    <div class="time-box-container">
+                        <div class="t-box"><span class="t-val" id="reunionDays">0</span><span class="t-lbl">Gün</span></div>
+                        <div class="t-box"><span class="t-val" id="reunionHours">0</span><span class="t-lbl">Sa</span></div>
+                        <div class="t-box"><span class="t-val" id="reunionMinutes">0</span><span class="t-lbl">Dk</span></div>
+                        <div class="t-box"><span class="t-val" id="reunionSeconds">0</span><span class="t-lbl">Sn</span></div>
+                    </div>
+                </div>
+            </div>
+            
+            <footer style="margin-top: 50px; color: #555; font-size: 0.8em;">
+                Design Enhanced for Hz.Bora.Efendi
+            </footer>
+        </div>
+    </section>
+
+    <script>
+        // --- SABİTLER VE AYARLAR ---
+        const DATES = {
+            FIRST: new Date('2025-05-27T00:00:00').getTime(),
+            REUNION: new Date('2025-11-14T00:00:00').getTime()
+        };
+
+        const COLORS = {
+            RED: 'rgba(255, 0, 0, 0.95)',
+            PINK: 'rgba(255, 20, 147, 0.9)',
+            BLUE: 'rgba(30, 144, 255, 0.8)'
+        };
+
+        // --- 1. ARKAPLAN PARÇACIK EFEKTİ ---
+        const initParticles = () => {
+            const canvas = document.getElementById('bgCanvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            const particles = [];
+            for(let i=0; i<50; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    r: Math.random() * 2 + 1,
+                    d: Math.random() * 0.5 + 0.1, // yoğunluk/hız
+                    color: Math.random() > 0.5 ? COLORS.PINK : COLORS.BLUE
+                });
+            }
+
+            function draw() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                particles.forEach(p => {
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = 0.5;
+                    ctx.fill();
+                    p.y -= p.d; // Yukarı doğru hareket
+                    if(p.y < -10) p.y = canvas.height + 10; // Döngü
+                });
+                requestAnimationFrame(draw);
+            }
+            draw();
+            
+            window.addEventListener('resize', () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            });
+        };
+
+        // --- 2. ZARF AÇMA MANTIĞI ---
+        function handleEnvelopeClick() {
+            const envelope = document.getElementById('mainEnvelope');
+            const btn = document.getElementById('openButton');
+            
+            // Animasyon Sınıfları
+            envelope.classList.add('open');
+            btn.style.opacity = '0';
+            
+            // Konfeti efekti (Basit CSS/JS hilesi)
+            createConfetti();
+
+            setTimeout(() => {
+                transitionScreen('screen1', 'screen2');
+                startTypeWriter();
+                // Köşe kalpleri başlat
+                ['ch1Canvas','ch2Canvas','ch3Canvas','ch4Canvas'].forEach(id => 
+                    startHeartLoop(id, COLORS.RED, 6.0));
+            }, 1200);
+        }
+
+        function createConfetti() {
+            // Basit bir konfeti patlaması simülasyonu
+            for(let i=0; i<30; i++) {
+                const conf = document.createElement('div');
+                conf.style.position = 'fixed';
+                conf.style.left = '50%';
+                conf.style.top = '50%';
+                conf.style.width = '10px';
+                conf.style.height = '10px';
+                conf.style.backgroundColor = Math.random() > 0.5 ? '#ff69b4' : '#1e90ff';
+                conf.style.transition = 'all 1s ease-out';
+                conf.style.zIndex = '100';
+                document.body.appendChild(conf);
+                
+                // Dağıt
+                setTimeout(() => {
+                    const x = (Math.random() - 0.5) * 500;
+                    const y = (Math.random() - 0.5) * 500;
+                    conf.style.transform = `translate(${x}px, ${y}px) rotate(${Math.random()*360}deg)`;
+                    conf.style.opacity = '0';
+                }, 50);
+                setTimeout(() => conf.remove(), 1050);
+            }
+        }
+
+        // --- 3. DAKTİLO EFEKTİ ---
+        function startTypeWriter() {
+            const text = document.getElementById('originalText').textContent;
+            const target = document.getElementById('typewriterTarget');
+            const signature = document.getElementById('signatureTarget');
+            let i = 0;
+            
+            target.innerHTML = ''; // Temizle
+            
+            function type() {
+                if (i < text.length) {
+                    target.innerHTML += text.charAt(i);
+                    i++;
+                    setTimeout(type, 40); // Yazma hızı
+                } else {
+                    // Yazma bitti
+                    target.classList.remove('typing-cursor');
+                    signature.style.opacity = '1';
+                    signature.style.transform = 'translateY(0)';
+                }
+            }
+            type();
+        }
+
+        function nextScreen() {
+            transitionScreen('screen2', 'screen3');
+            initMainDashboard();
+        }
+
+        function transitionScreen(fromId, toId) {
+            document.getElementById(fromId).classList.replace('active', 'hidden');
+            setTimeout(() => {
+                document.getElementById(toId).classList.replace('hidden', 'active');
+            }, 500);
+        }
+
+        // --- 4. KALP ÇİZİM ALGORİTMASI (Geliştirilmiş) ---
+        function xt(t) { return 16 * Math.pow(Math.sin(t), 3); }
+        function yt(t) { return 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); }
+
+        function startHeartLoop(canvasId, color, scale) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            // Çözünürlük ayarı
+            const size = canvas.width; 
+            const cx = size / 2;
+            const cy = size / 2;
+            let i = 0;
+            const iterations = 3000;
+
+            function loop() {
+                if (i >= iterations) {
+                    i = 0;
+                    ctx.clearRect(0, 0, size, size);
+                }
+                
+                // Hızlandırılmış çizim
+                for(let k=0; k<20; k++) {
+                    if (i >= iterations) break;
+                    const t = (i / iterations) * (2 * Math.PI) - (Math.PI / 2);
+                    const x = xt(t) * scale;
+                    const y = yt(t) * scale;
+
+                    ctx.beginPath();
+                    // Yüksekliği ortalamak için küçük düzeltme
+                    ctx.moveTo(cx, cy + (size * 0.05));
+                    ctx.lineTo(cx + x, cy - y);
+                    
+                    // Neon parlaklık efekti
+                    ctx.strokeStyle = color;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = color;
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.shadowBlur = 0; // Performans için kapat
+                    i++;
+                }
+                requestAnimationFrame(loop);
+            }
+            loop();
+        }
+
+        // --- 5. ZAMAN VE DASHBOARD ---
+        function formatDateTr(ts) {
+            const d = new Date(ts);
+            return d.toLocaleDateString('tr-TR', { day:'2-digit', month:'long', year:'numeric' }) + 
+                   ' ' + d.toLocaleTimeString('tr-TR', { hour:'2-digit', minute:'2-digit' });
+        }
+
+        function updateTime() {
+            const now = new Date();
+            
+            // Dijital Saat
+            document.getElementById('currentTimer').textContent = now.toLocaleTimeString('tr-TR');
+
+            // Analog Saat
+            const sec = now.getSeconds();
+            const min = now.getMinutes();
+            const hour = now.getHours();
+            
+            const sDeg = (sec / 60) * 360;
+            const mDeg = (min / 60) * 360 + (sec / 60) * 6;
+            const hDeg = ((hour % 12) / 12) * 360 + (min / 60) * 30;
+
+            document.getElementById('secondHand').style.transform = `rotate(${sDeg}deg)`;
+            document.getElementById('minuteHand').style.transform = `rotate(${mDeg}deg)`;
+            document.getElementById('hourHand').style.transform = `rotate(${hDeg}deg)`;
+
+            // Sayaçlar
+            updateCounter(now.getTime(), DATES.FIRST, 'first');
+            updateCounter(now.getTime(), DATES.REUNION, 'reunion');
+        }
+
+        function updateCounter(nowTime, targetTime, prefix) {
+            const diff = nowTime - targetTime;
+            const isFuture = diff < 0;
+            const absDiff = Math.abs(diff);
+
+            const days = Math.floor(absDiff / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((absDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((absDiff % (1000 * 60 * 60)) / (1000 * 60));
+            const seconds = Math.floor((absDiff % (1000 * 60)) / 1000);
+
+            if (isFuture) {
+                document.getElementById(prefix + 'DateElapsed').textContent = `Kalan Süre: ${days} gün`;
+            } else {
+                document.getElementById(prefix + 'DateElapsed').textContent = `${days} gün önce gerçekleşti`;
+            }
+
+            document.getElementById(prefix + 'Days').textContent = days;
+            document.getElementById(prefix + 'Hours').textContent = String(hours).padStart(2,'0');
+            document.getElementById(prefix + 'Minutes').textContent = String(minutes).padStart(2,'0');
+            document.getElementById(prefix + 'Seconds').textContent = String(seconds).padStart(2,'0');
+        }
+
+        let isDashboardInit = false;
+        function initMainDashboard() {
+            if(isDashboardInit) return;
+            isDashboardInit = true;
+
+            // Statik metinleri bir kez ayarla
+            document.getElementById('firstDateDisplay').textContent = formatDateTr(DATES.FIRST);
+            document.getElementById('reunionDateDisplay').textContent = formatDateTr(DATES.REUNION);
+
+            // Kalpleri Başlat
+            startHeartLoop('pinkHeartCanvas', COLORS.PINK, 8.0);
+            startHeartLoop('blueHeartCanvas', COLORS.BLUE, 8.0);
+
+            // Zamanlayıcı Döngüsü
+            updateTime();
+            setInterval(updateTime, 1000);
+        }
+
+        // Başlangıç
+        window.onload = initParticles;
+
+    </script>
+</body>
